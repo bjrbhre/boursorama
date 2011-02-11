@@ -10,7 +10,6 @@ class Boursorama
     end
     
     RELEVES_COMPTES_AJAX = "/ajax/clients/comptes/ereporting/releves_comptes_ajax.php"
-#    data = "univers=Banque&type_demande=cc&numero_compte='+numero_compte+'&starttime=&endtime=13/01/2011"
     
     attr_reader :name, :number, :total
     def initialize(session, node)
