@@ -9,8 +9,31 @@ class Boursorama
       def body; @session.get(@url).body end
     end
     
-    RELEVES_COMPTES_AJAX = "/ajax/clients/comptes/ereporting/releves_comptes_ajax.php"
+    class Telechargement
+      def initialize(session, bibliothequeAS400, fichierAS400, numeroMembre, nomFichier, numeroOrdre, isFichierDispo)
+        @session, @bibliothequeAS400, @fichierAS400, @numeroMembre, @nomFichier, @numeroOrdre, @isFichierDispo = session, bibliothequeAS400, fichierAS400, numeroMembre, nomFichier, numeroOrdre, isFichierDispo
+      end
+
+      def name; @nomFichier end
+      def body
+        @session.post(TELECHARGEMENT) {|req|
+          req.form_data = {
+            'bibliothequeAS400' => @bibliothequeAS400,
+            'fichierAS400' => @fichierAS400,
+            'numeroMembre' => @numeroMembre,
+            'nomFichier' => @nomFichier,
+            'numeroOrdre' => @numeroOrdre,
+            'isFichierDispo' => @isFichierDispo,
+            'downloading' => "yes"
+          }
+        }.body
+      end
+    end
     
+    RELEVES_COMPTES_AJAX = "/ajax/clients/comptes/ereporting/releves_comptes_ajax.php"
+    TELECHARGEMENT_CREATION = "/clients/comptes/banque/detail/telechargement_creation.phtml"
+    TELECHARGEMENT = "/clients/comptes/banque/detail/telechargement.phtml"
+
     attr_reader :name, :number, :total
     def initialize(session, node)
       @session = session
@@ -19,7 +42,6 @@ class Boursorama
       @total = node.at("td.account-total span").text
 #      @url = node.at("td.account-name a")["href"]
     end
-    
     
     def releves(endtime = nil, starttime = nil)
       endtime ||= Time.new
@@ -33,6 +55,24 @@ class Boursorama
       
       doc = Nokogiri::HTML(res.body, nil, "iso-8859-1")
       doc.search("a").map {|r| Releve.new(@session, r.text.gsub("/", "\u2044"), r['href'])}
+    end
+    
+    def telechargement_creation(endtime = nil, starttime = nil, formatFichier = "X")
+      endtime ||= Time.new
+      starttime ||= endtime - 2678400
+      res = @session.post(TELECHARGEMENT_CREATION) {|req| 
+        req.form_data = {'formatFichier' => formatFichier,
+                         'periode1' => "choixUtilisateur",
+                         'startTime' => starttime.strftime("%d/%m/%Y"),
+                         'endTime' => endtime.strftime("%d/%m/%Y")}
+      }
+    end
+    
+    def telechargements
+      doc = Nokogiri::HTML(@session.get(TELECHARGEMENT).body)
+      doc.search("form[name='telechargement'] input[name='infos']").map {|i|
+        Telechargement.new(@session, *i["onclick"].scan(/'([\w\.]+)'/).flatten)
+      }
     end
   end
   
