@@ -1,8 +1,12 @@
+# encoding: UTF-8
+
 require "net/http"
 require "nokogiri"
 
 class Boursorama
   class Account
+    Mouvement = Struct.new(:date, :name, :type, :value)
+    
     class Releve
       attr_reader :name
       def initialize(session, name, url); @session, @name, @url = session, name, url end
@@ -30,6 +34,7 @@ class Boursorama
       end
     end
     
+    MOUVEMENTS = "/clients/comptes/banque/detail/mouvements.phtml"
     RELEVES_COMPTES_AJAX = "/ajax/clients/comptes/ereporting/releves_comptes_ajax.php"
     TELECHARGEMENT_CREATION = "/clients/comptes/banque/detail/telechargement_creation.phtml"
     TELECHARGEMENT = "/clients/comptes/banque/detail/telechargement.phtml"
@@ -61,10 +66,12 @@ class Boursorama
       endtime ||= Time.new
       starttime ||= endtime - 2678400
       res = @session.post(TELECHARGEMENT_CREATION) {|req| 
-        req.form_data = {'formatFichier' => formatFichier,
-                         'periode1' => "choixUtilisateur",
-                         'startTime' => starttime.strftime("%d/%m/%Y"),
-                         'endTime' => endtime.strftime("%d/%m/%Y")}
+        req.form_data = {
+                          'formatFichier' => formatFichier,
+                          'periode1' => "choixUtilisateur",
+                          'startTime' => starttime.strftime("%d/%m/%Y"),
+                          'endTime' => endtime.strftime("%d/%m/%Y")
+                         }
       }
     end
     
@@ -73,6 +80,21 @@ class Boursorama
       doc.search("form[name='telechargement'] input[name='infos']").map {|i|
         Telechargement.new(@session, *i["onclick"].scan(/'([\w\.]+)'/).flatten)
       }
+    end
+    
+    def mouvements(date = nil)
+      url = MOUVEMENTS
+      url += "?month=#{date.month}&year=#{date.year}" if date
+      doc = Nokogiri::HTML(@session.get(url).body)
+      doc.search("#customer-page tbody tr").map {|m|
+         tds = m.search("td")
+         next if tds.size == 0 or tds.size < 6
+         date, name, type, valuen, valuep = tds[0].text, tds[2].text.strip, tds[2].at("div")["title"], tds[3].text, tds[4].text
+         value = valuen.empty? ? valuep : valuen
+         value = value.gsub(/[^0-9,-]/,'').sub(",", ".").to_f
+         type.sub!("Nature de l'opération : ", "")
+         Mouvement.new date, name, type, value
+      }.compact
     end
   end
   
