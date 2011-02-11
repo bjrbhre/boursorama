@@ -4,6 +4,8 @@ require "net/http"
 require "nokogiri"
 
 class Boursorama
+  VERSION='0.1b'
+
   class Account
     Mouvement = Struct.new(:date, :name, :type, :value)
     
@@ -102,13 +104,15 @@ class Boursorama
   HOST = "www.boursorama.com"
   LOGIN = "/logunique.phtml"
   SYNTHESE = "/clients/synthese.phtml"
+  USER_AGENT = "boursorama.rb/#{VERSION}"
   
   def get(url)
     http = Net::HTTP.new(HOST, 443)
     http.use_ssl = true
     req = Net::HTTP::Get.new(url)
+    req["User-Agent"] = USER_AGENT
     req["Cookie"] = @cookies.map {|k,v| "#{k}=#{v}"}.join("; ")
-    
+
     http.request(req)
   end
   
@@ -116,6 +120,7 @@ class Boursorama
     http = Net::HTTP.new(HOST, 443)
     http.use_ssl = true
     req = Net::HTTP::Post.new(url)
+    req["User-Agent"] = USER_AGENT
     req["Cookie"] = @cookies.map {|k,v| "#{k}=#{v}"}.join("; ") if @cookies
     yield req if block_given?
     
