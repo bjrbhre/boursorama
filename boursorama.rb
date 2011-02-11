@@ -90,6 +90,7 @@ class Boursorama
          tds = m.search("td")
          next if tds.size == 0 or tds.size < 6
          date, name, type, valuen, valuep = tds[0].text, tds[2].text.strip, tds[2].at("div")["title"], tds[3].text, tds[4].text
+         date = Time.new(*date.split("/").reverse)
          value = valuen.empty? ? valuep : valuen
          value = value.gsub(/[^0-9,-]/,'').sub(",", ".").to_f
          type.sub!("Nature de l'opération : ", "")
