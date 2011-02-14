@@ -7,7 +7,7 @@ Pour accéder au code source : http://github.com/hanklords/boursorama
 Utilisation
 -----------
 
-Voici commander utiliser la bibliotèque :
+Voici comment utiliser la bibliotèque :
 
 ### Connexion
 
