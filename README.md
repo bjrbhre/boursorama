@@ -2,7 +2,8 @@ API Ruby pour Boursorama
 ========================
 
 Ceci est une bibliothèque en Ruby pour acceder aux service de banque en ligne de  [Boursorama](http://boursorama.com).
-Pour accéder au code source : http://github.com/hanklords/boursorama
+
+Pour accéder au code source : <http://github.com/hanklords/boursorama>
 
 Utilisation
 -----------
