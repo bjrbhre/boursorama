@@ -4,7 +4,7 @@ require "net/http"
 require "nokogiri"
 
 class Boursorama
-  VERSION='0.1b'
+  VERSION='0.1'
 
   class Account
     Mouvement = Struct.new(:date, :name, :type, :value)
