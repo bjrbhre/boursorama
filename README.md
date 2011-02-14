@@ -39,7 +39,7 @@ Télécharger le dernier relevé de comptes :
 
 ### Téléchargements
 
-Télécharger les mouvements en format CSV :
+Télécharger les mouvements en format texte :
 
     boursorama.accounts.first.telechargement_creation
     sleep 5 # Pause pour laisser le serveur traiter la demande...
