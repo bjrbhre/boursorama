@@ -7,7 +7,16 @@ class Boursorama
   VERSION='0.1'
 
   class Account
-    Mouvement = Struct.new(:date, :name, :type, :value)
+    class Mouvement
+      attr_reader :date, :name, :type, :value
+      def initialize(node)
+         date, @name, type, valuen, valuep = node[0].text, node[2].text.strip, node[2].at("div")["title"], node[3].text, node[4].text
+         @date = Time.new(*date.split("/").reverse)
+         value = valuen.empty? ? valuep : valuen
+         @value = value.gsub(/[^0-9,-]/,'').sub(",", ".").to_f
+         @type = type.sub("Nature de l'opération : ", "")
+      end
+    end
     
     class Releve
       attr_reader :name
@@ -89,13 +98,8 @@ class Boursorama
       doc = Nokogiri::HTML(@session.get(url).body)
       doc.search("#customer-page tbody tr").map {|m|
          tds = m.search("td")
-         next if tds.size == 0 or tds.size < 6
-         date, name, type, valuen, valuep = tds[0].text, tds[2].text.strip, tds[2].at("div")["title"], tds[3].text, tds[4].text
-         date = Time.new(*date.split("/").reverse)
-         value = valuen.empty? ? valuep : valuen
-         value = value.gsub(/[^0-9,-]/,'').sub(",", ".").to_f
-         type.sub!("Nature de l'opération : ", "")
-         Mouvement.new date, name, type, value
+         next if tds.size < 6
+         Mouvement.new(tds)
       }.compact
     end
   end
