@@ -36,7 +36,6 @@ class Boursorama
       end
     end
     
-    MOUVEMENTS = "/clients/comptes/banque/detail/mouvements.phtml"
     RELEVES_COMPTES_AJAX = "/ajax/clients/comptes/ereporting/releves_comptes_ajax.php"
     TELECHARGEMENT_CREATION = "/clients/comptes/banque/detail/telechargement_creation.phtml"
     TELECHARGEMENT = "/clients/comptes/banque/detail/telechargement.phtml"
@@ -47,7 +46,7 @@ class Boursorama
       @name = node.at("td.account-name a").text
       @number = node.at("td.account-number").text.strip
       @total = node.at("td.account-total span").text
-#      @url = node.at("td.account-name a")["href"]
+      @mouvements_url = node.at("td.account-more-actions a[id$=-mouvements]")['href']
     end
     
     def releves(endtime = nil, starttime = nil)
@@ -85,8 +84,8 @@ class Boursorama
     end
     
     def mouvements(date = nil)
-      url = MOUVEMENTS
-      url += "?month=#{date.month}&year=#{date.year}" if date
+      url = @mouvements_url
+      url += "&month=#{date.month}&year=#{date.year}" if date
       doc = Nokogiri::HTML(@session.get(url).body)
       doc.search("#customer-page tbody tr").map {|m|
          tds = m.search("td")
