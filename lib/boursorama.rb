@@ -6,43 +6,83 @@ require "nokogiri"
 class Boursorama
   VERSION='0.1'
 
-  class Account
-    class Mouvement
-      attr_reader :date, :name, :type, :value
-      def initialize(node)
-         date, @name, type, valuen, valuep = node[0].text, node[2].text.strip, node[2].at("div")["title"], node[3].text, node[4].text
-         @date = Time.new(*date.split("/").reverse)
-         value = valuen.empty? ? valuep : valuen
-         @value = value.gsub(/[^0-9,-]/,'').sub(",", ".").to_f
-         @type = type.sub("Nature de l'opération : ", "")
-      end
+  class Page
+    def initialize(session, url)
+      @page = Nokogiri::HTML(session.get(url).body)
+      p @page.search("ul.tabs a").map {|a| a.text}
     end
+  end
+  
+  class Mouvement
+    attr_reader :date, :name, :type, :value
+    def initialize(node)
+        date, @name, type, valuen, valuep = node[0].text, node[2].text.strip, node[2].at("div")["title"], node[3].text, node[4].text
+        @date = Time.new(*date.split("/").reverse)
+        value = valuen.empty? ? valuep : valuen
+        @value = value.gsub(/[^0-9,-]/,'').sub(",", ".").to_f
+        @type = type.sub("Nature de l'opération : ", "")
+    end
+  end 
     
+  class Mouvements < Page
+    include Enumerable
+    def each; @list.each {|m| yield m} end
+    def [](i); @list[i] end
+
+    def initialize(session, url, date)
+      url += "&month=#{date.month}&year=#{date.year}" if date
+      super(session, url)
+      @list = []
+      @page.search("#customer-page tbody tr").each {|m|
+         tds = m.search("td")
+         next if tds.size < 6
+         @list << Mouvement.new(tds)
+      }
+      @page = nil
+    end
+  end
+  
+  class Telechargement
+    def initialize(session, bibliothequeAS400, fichierAS400, numeroMembre, nomFichier, numeroOrdre, isFichierDispo)
+      @session, @bibliothequeAS400, @fichierAS400, @numeroMembre, @nomFichier, @numeroOrdre, @isFichierDispo = session, bibliothequeAS400, fichierAS400, numeroMembre, nomFichier, numeroOrdre, isFichierDispo
+    end
+
+    def name; @nomFichier end
+    def body
+      @session.post(TELECHARGEMENT) {|req|
+        req.form_data = {
+          'bibliothequeAS400' => @bibliothequeAS400,
+          'fichierAS400' => @fichierAS400,
+          'numeroMembre' => @numeroMembre,
+          'nomFichier' => @nomFichier,
+          'numeroOrdre' => @numeroOrdre,
+          'isFichierDispo' => @isFichierDispo,
+          'downloading' => "yes"
+        }
+      }.body
+    end
+  end
+  
+  class Telechargements < Page
+    include Enumerable
+    def each; @list.each {|m| yield m} end
+    def [](i); @list[i] end
+
+    def initialize(session, url)
+      super(session, url)
+      @list = []
+      @page.search("form[name='telechargement'] input[name='infos']").each {|i|
+        @list << Telechargement.new(@session, *i["onclick"].scan(/'([\w\.]+)'/).flatten)
+      }
+      @page = nil
+    end
+  end
+      
+  class Account
     class Releve
       attr_reader :name
       def initialize(session, name, url); @session, @name, @url = session, name, url end
       def body; @session.get(@url).body end
-    end
-    
-    class Telechargement
-      def initialize(session, bibliothequeAS400, fichierAS400, numeroMembre, nomFichier, numeroOrdre, isFichierDispo)
-        @session, @bibliothequeAS400, @fichierAS400, @numeroMembre, @nomFichier, @numeroOrdre, @isFichierDispo = session, bibliothequeAS400, fichierAS400, numeroMembre, nomFichier, numeroOrdre, isFichierDispo
-      end
-
-      def name; @nomFichier end
-      def body
-        @session.post(TELECHARGEMENT) {|req|
-          req.form_data = {
-            'bibliothequeAS400' => @bibliothequeAS400,
-            'fichierAS400' => @fichierAS400,
-            'numeroMembre' => @numeroMembre,
-            'nomFichier' => @nomFichier,
-            'numeroOrdre' => @numeroOrdre,
-            'isFichierDispo' => @isFichierDispo,
-            'downloading' => "yes"
-          }
-        }.body
-      end
     end
     
     RELEVES_COMPTES_AJAX = "/ajax/clients/comptes/ereporting/releves_comptes_ajax.php"
@@ -56,6 +96,8 @@ class Boursorama
       @number = node.at("td.account-number").text.strip
       @total = node.at("td.account-total span").text
       @mouvements_url = node.at("td.account-more-actions a[id$=-mouvements]")['href']
+      
+      node.search("td.account-more-actions a").each {|a| p a['id'].split('-').map {|w| w.capitalize}.join if a['id']}
     end
     
     def releves(endtime = nil, starttime = nil)
@@ -85,23 +127,9 @@ class Boursorama
       }
     end
     
-    def telechargements
-      doc = Nokogiri::HTML(@session.get(TELECHARGEMENT).body)
-      doc.search("form[name='telechargement'] input[name='infos']").map {|i|
-        Telechargement.new(@session, *i["onclick"].scan(/'([\w\.]+)'/).flatten)
-      }
-    end
+    def telechargements; Telechargements.new(@session, TELECHARGEMENT) end
     
-    def mouvements(date = nil)
-      url = @mouvements_url
-      url += "&month=#{date.month}&year=#{date.year}" if date
-      doc = Nokogiri::HTML(@session.get(url).body)
-      doc.search("#customer-page tbody tr").map {|m|
-         tds = m.search("td")
-         next if tds.size < 6
-         Mouvement.new(tds)
-      }.compact
-    end
+    def mouvements(date = nil); Mouvements.new(@session, @mouvements_url, date) end
   end
   
   HOST = "www.boursorama.com"
@@ -146,5 +174,9 @@ class Boursorama
 
   def accounts
     @synthese.search("#synthese-list tr.L10").map {|acc| Account.new(self, acc) }
+  end
+  
+  def page
+    Page.new(self, "/clients/comptes/banque/detail/mouvements.phtml")
   end
 end
